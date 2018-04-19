@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 by WIZnet <support@wiznet.co.kr>
+ * Copyright (c) 2010 by Arduino LLC. All rights reserved.
  *
  * This file is free software; you can redistribute it and/or modify
  * it under the terms of either the GNU General Public License version 2
@@ -12,25 +12,11 @@
 
 #include <SPI.h>
 
-typedef signed char sint8;
-typedef sint8 SOCKET;
-//typedef uint8_t SOCKET;
+#define ETHERNET_SHIELD_SPI_CS 10
 
-//#define W5100_ETHERNET_SHIELD // Arduino Ethenret Shield and Compatibles ...
-//#define W5200_ETHERNET_SHIELD // WIZ820io, W5200 Ethernet Shield 
-#define W5500_ETHERNET_SHIELD   // WIZ550io, ioShield series of WIZnet
-
-#if defined(W5500_ETHERNET_SHIELD)
-//#define WIZ550io_WITH_MACADDRESS // Use assigned MAC address of WIZ550io
-#include "utility/w5500.h"
-#endif
-
-#if defined(W5200_ETHERNET_SHIELD)
-#include "utility/w5200.h"
-#endif
-
-#if defined(W5100_ETHERNET_SHIELD)
 #define MAX_SOCK_NUM 4
+
+typedef uint8_t SOCKET;
 
 #define IDM_OR  0x8000
 #define IDM_AR0 0x8001
@@ -338,30 +324,45 @@ private:
   uint16_t RBASE[SOCKETS]; // Rx buffer base address
 
 private:
-#if defined(ARDUINO_ARCH_AVR)
-#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega1284P__)
-  inline static void initSS()    { DDRB  |=  _BV(4); };
-  inline static void setSS()     { PORTB &= ~_BV(4); };
-  inline static void resetSS()   { PORTB |=  _BV(4); };
-#elif defined(__AVR_ATmega32U4__)
-  inline static void initSS()    { DDRB  |=  _BV(6); };
-  inline static void setSS()     { PORTB &= ~_BV(6); };
-  inline static void resetSS()   { PORTB |=  _BV(6); }; 
-#elif defined(__AVR_AT90USB1286__) || defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB162__)
-  inline static void initSS()    { DDRB  |=  _BV(0); };
-  inline static void setSS()     { PORTB &= ~_BV(0); };
-  inline static void resetSS()   { PORTB |=  _BV(0); }; 
-#elif defined(REL_GR_KURUMI) || defined(REL_GR_KURUMI_PROTOTYPE)
-  inline static void initSS()    { pinMode(SS, OUTPUT); \
-                                   digitalWrite(SS, HIGH); };
-  inline static void setSS()     { digitalWrite(SS, LOW); };
-  inline static void resetSS()   { digitalWrite(SS, HIGH); };
+#if !defined(SPI_HAS_EXTENDED_CS_PIN_HANDLING)
+  #define SPI_ETHERNET_SETTINGS SPISettings(4000000, MSBFIRST, SPI_MODE0)
+  #if defined(ARDUINO_ARCH_AVR)
+    #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
+      inline static void initSS()    { DDRB  |=  _BV(4); };
+      inline static void setSS()     { PORTB &= ~_BV(4); };
+      inline static void resetSS()   { PORTB |=  _BV(4); };
+    #elif defined(__AVR_ATmega32U4__)
+      inline static void initSS()    { DDRB  |=  _BV(6); };
+      inline static void setSS()     { PORTB &= ~_BV(6); };
+      inline static void resetSS()   { PORTB |=  _BV(6); };
+    #elif defined(__AVR_AT90USB1286__) || defined(__AVR_AT90USB646__) || defined(__AVR_AT90USB162__)
+      inline static void initSS()    { DDRB  |=  _BV(0); };
+      inline static void setSS()     { PORTB &= ~_BV(0); };
+      inline static void resetSS()   { PORTB |=  _BV(0); };
+    #else
+      inline static void initSS()    { DDRB  |=  _BV(2); };
+      inline static void setSS()     { PORTB &= ~_BV(2); };
+      inline static void resetSS()   { PORTB |=  _BV(2); };
+    #endif
+  #elif defined(__ARDUINO_ARC__)
+	inline static void initSS() { pinMode(10, OUTPUT); };
+	inline static void setSS() { digitalWrite(10, LOW); };
+	inline static void resetSS() { digitalWrite(10, HIGH); };
+  #else
+    inline static void initSS() {
+      *portModeRegister(digitalPinToPort(ETHERNET_SHIELD_SPI_CS)) |= digitalPinToBitMask(ETHERNET_SHIELD_SPI_CS);
+    }
+    inline static void setSS()   {
+      *portOutputRegister(digitalPinToPort(ETHERNET_SHIELD_SPI_CS)) &= ~digitalPinToBitMask(ETHERNET_SHIELD_SPI_CS);
+    }
+    inline static void resetSS() {
+      *portOutputRegister(digitalPinToPort(ETHERNET_SHIELD_SPI_CS)) |= digitalPinToBitMask(ETHERNET_SHIELD_SPI_CS);
+    }
+  #endif
 #else
-  inline static void initSS()    { DDRB  |=  _BV(2); };
-  inline static void setSS()     { PORTB &= ~_BV(2); };
-  inline static void resetSS()   { PORTB |=  _BV(2); };
+  #define SPI_ETHERNET_SETTINGS ETHERNET_SHIELD_SPI_CS,SPISettings(4000000, MSBFIRST, SPI_MODE0)
+  // initSS(), setSS(), resetSS() not needed with EXTENDED_CS_PIN_HANDLING
 #endif
-#endif // ARDUINO_ARCH_AVR
 };
 
 extern W5100Class W5100;
@@ -421,6 +422,5 @@ void W5100Class::setRetransmissionTime(uint16_t _timeout) {
 void W5100Class::setRetransmissionCount(uint8_t _retry) {
   writeRCR(_retry);
 }
-#endif
 
 #endif
