@@ -809,6 +809,7 @@ BMP280::BMP280()
 
 
 bool BMP280::begin(uint8_t a, uint8_t  b, uint8_t chipid) {
+   Wire.begin();
    Wire.beginTransmission(118);
    int error = Wire.endTransmission();
    if (error == 0)
