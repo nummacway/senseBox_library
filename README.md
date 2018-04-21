@@ -4,7 +4,7 @@ Use Library for the following sensors:
 
 - HDC100X
 - VEML 6070
-- TSL45315
+- CJMCU-3216/AP3216 behaving like TSL45315
 - BMP 280
 - HC SR04 Ultrasonic Sensor
 - RV8523 RTC
@@ -16,7 +16,7 @@ Include library with `#include <SenseBox.h>`. Before the setup routine define th
 
 - `HDC100X HDC1(0,0);` define the I2C-Adress within the Brackets
 - `Ultrasonic Ultrasonic(3,4);` set RX and TX Pins
-- `TSL45315 luxsensor = TSL45315(TSL45315_TIME_M4);`
+- `TSL45315 luxsensor = TSL45315();`
 - `VEML6070 uvsensor;`
 - `RV8523 rtc;`
 - `OpenSenseMap osem();` optional args: API domain & local IP
