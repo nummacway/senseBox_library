@@ -200,27 +200,31 @@ class HDC100X{
 };
 //---------------HDC------END-------------------------//
 
-//-----Helligkeitssensor 45315----//
+//-----Helligkeitssensor 3216----//
 /***************************************************
-  This is a library for the TSL45315 Lux sensor breakout board by Watterott
+  This is a library for the CJMCU-3216/AP3216 Lux sensor breakout board made compatible with the TSL45315 lib
   These sensors use I2C to communicate, 2 pins are required to interface
 
-  Written by Adi Dax/Makerblog.at
+  Written by Redeemer (numma_cway)
   BSD license, all text above must be included in any redistribution
  ****************************************************/
 
 class TSL45315 {
 public:
-	TSL45315(uint8_t resolution);
 	TSL45315(void);
 	boolean begin(void);
-	int getLux(void);
+	float getLux(void);
 	boolean powerDown(void);
 
 
 private:
-	uint16_t _low, _high, _timerfactor;
-	uint8_t _resolution;
+	byte range;
+  float factor;
+  void AP3216_write(int regAddress, int value);
+  byte AP3216_read(int regAddress);
+  word alsReadCount(void);
+  void alsSetRange(byte newRange);
+  
 };
 //----------------------------------------//
 

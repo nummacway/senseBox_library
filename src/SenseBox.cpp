@@ -266,34 +266,72 @@ void HDC100X::setRegister(uint8_t reg){
 //------------------------------------------------------------------------------------------HDC100X Stuff End------------------------//
 
 
-//--------------------------------------------------------------------------------Helligkeitssensor 45315 begin------------------------//
+//--------------------------------------------------------------------------------Helligkeitssensor 3216 begin------------------------//
 /***************************************************
-  This is a library for the TSL45315 Lux sensor breakout board by Watterott
+  This is a library for the CJMCU-3216/AP3216 Lux sensor breakout board made compatible with the TSL45315 lib
   These sensors use I2C to communicate, 2 pins are required to interface
 
-  Written by Adi Dax/Makerblog.at
+  Written by Redeemer (numma_cway)
   BSD license, all text above must be included in any redistribution
  ****************************************************/
 
-TSL45315::TSL45315(uint8_t resolution)
-{
-	_resolution = resolution;
-	_timerfactor = 0;
-	if (resolution == uint8_t(TSL45315_TIME_M1)) {
-		_timerfactor = 1;
-	}
-	if (resolution == uint8_t(TSL45315_TIME_M2)) {
-		_timerfactor = 2;
-	}
-	if (resolution == uint8_t(TSL45315_TIME_M4)) {
-		_timerfactor = 4;
-	}
-}
-
 TSL45315::TSL45315(void)
 {
-	_timerfactor = 4;
+	range = 1;
+  factor = 0.35;
 }
+
+/*========================================================================*/
+/*                           PRIVATE FUNCTIONS                            */
+/*========================================================================*/
+
+void TSL45315::AP3216_write(int regAddress, int value) {
+  Wire.beginTransmission(0x1E); // I2C Address of AP3216 sensor is 0x1E
+  Wire.write(regAddress);
+  Wire.write(value);
+  Wire.endTransmission(); 
+}
+
+byte TSL45315::AP3216_read(int regAddress) {
+  Wire.beginTransmission(0x1E); // I2C Address of AP3216 sensor is 0x1E
+  Wire.write(regAddress);
+  Wire.endTransmission();
+  Wire.requestFrom(0x1E, 1, true);
+  return Wire.read() & 0xFF;
+}
+
+word TSL45315::alsReadCount()
+{
+  return (AP3216_read(0x0D) << 8) | AP3216_read(0x0C);
+}
+
+void TSL45315::alsSetRange(byte newRange)
+{
+  AP3216_write(0x10, (newRange - 1) << 4);
+  range = newRange;
+  switch ( range )
+  {
+    case 1: factor = 0.35;
+            break;
+    case 2: factor = 0.0788;
+            break;
+    case 3: factor = 0.0197;
+            break;
+    case 4: factor = 0.0049;
+            break;
+  }
+  // Found by testing
+  delay(50);
+  alsReadCount();
+  delay(50);
+  alsReadCount();
+  delay(50);
+  alsReadCount();
+  delay(50);
+  alsReadCount();
+  delay(50);
+}
+
 
 
 /*========================================================================*/
@@ -301,64 +339,41 @@ TSL45315::TSL45315(void)
 /*========================================================================*/
 boolean TSL45315::begin(void)
 {
-	Wire.begin();
-	Wire.beginTransmission(TSL45315_I2C_ADDR);
-		Wire.write(0x80|TSL45315_REG_ID);
-		Wire.endTransmission();
-
-		Wire.requestFrom(TSL45315_I2C_ADDR, 1);
-		while(Wire.available())
-		{
-		unsigned char c = Wire.read();
-		c = c & 0xF0;
-		if (c != 0xA0) {
-			return false;
-		}
-		}
-
-		Wire.beginTransmission(TSL45315_I2C_ADDR);
-		Wire.write(0x80|TSL45315_REG_CONTROL);
-		Wire.write(0x03);
-		Wire.endTransmission();
-
-		Wire.beginTransmission(TSL45315_I2C_ADDR);
-		Wire.write(0x80|TSL45315_REG_CONFIG);
-		Wire.write(_resolution);
-		Wire.endTransmission();
-
-	return true;
+	AP3216_write(0x00, 0x01);
+  return true;
 }
 
 
-int TSL45315::getLux(void)
+float TSL45315::getLux(void)
 {
-	uint32_t lux;
+	word count = alsReadCount();
 
-     Wire.beginTransmission(TSL45315_I2C_ADDR);
-     Wire.write(0x80|TSL45315_REG_DATALOW);
-     Wire.endTransmission();
-     Wire.requestFrom(TSL45315_I2C_ADDR, 2);
-     _low = Wire.read();
-     _high = Wire.read();
-     while(Wire.available()){
-       Wire.read();
-     }
+  // Can we get more accuracy by using a higher range number?
+  // To be able to fall back, we do this first, because a less accurate measurement by a lower range number is better than an exceed range
+  if ( ( (range == 1) && ( count < 14754 ) ) || // < 5164.158 lx
+       ( ( (range == 2) || ( range == 3) ) && ( count < 16383 ) ) ) // < 1291.0395 lx or < 321.1215 lx
+  {
+    alsSetRange(range + 1);
+    count = alsReadCount();
+  }
+  
+  // Do we have to change the range to be able to get a measurement that doesn't exceed the range?
+  while ( (count == 65535) && (range > 1) )
+  {
+    alsSetRange(range - 1);
+    count = alsReadCount();
+  }
 
-     lux  = (_high<<8) | _low;
-	 int lux_ = (int) lux * _timerfactor;
- return  lux_;
+  return factor * count;
 }
 
 
 boolean TSL45315::powerDown(void)
 {
-	 Wire.beginTransmission(TSL45315_I2C_ADDR);
-	 Wire.write(0x80|TSL45315_REG_CONTROL);
-	 Wire.write(0x00);
-	 Wire.endTransmission();
- return true;
+	AP3216_write(0x00, 0x00);
+  return true;
 }
-//-----Helligkeitssensor 45315 end----//
+//-----Helligkeitssensor 3216 end----//
 
 
 //-----VEML6070 UV Sensor begin ----///
