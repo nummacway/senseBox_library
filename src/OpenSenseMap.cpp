@@ -33,7 +33,16 @@ void OpenSenseMap::beginEthernet(const char* ipAddress)
   else
   {
     log("done! IP Address is: \n");
-    log(Ethernet.localIP());
+    for (byte thisByte = 0; thisByte < 4; thisByte++) {
+    // print the value of each byte of the IP address:
+    int number = Ethernet.localIP()[thisByte];
+    if (number > 99)
+    log((char) (int) (number / 100) + 48 );
+  if (number > 9)
+    log((char) (int) (number / 10) % 10 + 48 );
+    log((char) (int) (number % 10) + 48 );
+    log(".");
+    }
   }
 }
 
