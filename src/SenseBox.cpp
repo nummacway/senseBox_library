@@ -14,6 +14,7 @@
 # include "WProgram.h"
 #endif
 #include "Wire.h"
+#include "RTClib.h"
 #include <math.h>
 
 
@@ -339,6 +340,7 @@ void TSL45315::alsSetRange(byte newRange)
 /*========================================================================*/
 boolean TSL45315::begin(void)
 {
+  Wire.begin();
 	AP3216_write(0x00, 0x01);
   return true;
 }
@@ -423,10 +425,9 @@ return (int) uvValue*5;
 
 //-----------------RTC BEGIN-------
 /*
-  RV8523 RTC Lib for Arduino
-  by Watterott electronic (www.watterott.com)
+  Texas Instruments DS1307 RTC Lib for Arduino
+  Adapter that converts calls to the RV8523 RTC lib into calls to Adafruit RTC lib
  */
-#define I2C_ADDR (0xD0>>1)
 
 
 //-------------------- Constructor --------------------
@@ -435,8 +436,7 @@ return (int) uvValue*5;
 RV8523::RV8523(void)
 {
   Wire.begin();
-
-  return;
+  clockObj = RTC_DS1307();
 }
 
 
@@ -445,153 +445,32 @@ RV8523::RV8523(void)
 
 void RV8523::start(void)
 {
-  uint8_t val;
-
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x00)); //control 1
-  Wire.endTransmission();
-  Wire.requestFrom(I2C_ADDR, 1);
-  val = Wire.read();
-
-  if(val & (1<<5))
-  {
-    Wire.beginTransmission(I2C_ADDR);
-    Wire.write(byte(0x00)); //control 1
-    Wire.write(val & ~(1<<5)); //clear STOP (bit 5)
-    Wire.endTransmission();
-  }
-
-  return;
+  begin();
 }
-
-
-void RV8523::stop(void)
-{
-  uint8_t val;
-
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x00)); //control 1
-  Wire.endTransmission();
-  Wire.requestFrom(I2C_ADDR, 1);
-  val = Wire.read();
-
-  if(!(val & (1<<5)))
-  {
-    Wire.beginTransmission(I2C_ADDR);
-    Wire.write(byte(0x00)); //control 1
-    Wire.write(val | (1<<5)); //set STOP (bit 5)
-    Wire.endTransmission();
-  }
-
-  return;
-}
-
-
-void RV8523::set12HourMode(void) //set 12 hour mode
-{
-  uint8_t val;
-
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x00)); //control 1
-  Wire.endTransmission();
-  Wire.requestFrom(I2C_ADDR, 1);
-  val = Wire.read();
-
-  if(!(val & (1<<3)))
-  {
-    Wire.beginTransmission(I2C_ADDR);
-    Wire.write(byte(0x00)); //control 1
-    Wire.write(val | (1<<3)); //set 12 hour mode (bit 3)
-    Wire.endTransmission();
-  }
-
-  return;
-}
-
-
-void RV8523::set24HourMode(void) //set 24 hour mode
-{
-  uint8_t val;
-
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x00)); //control 1
-  Wire.endTransmission();
-  Wire.requestFrom(I2C_ADDR, 1);
-  val = Wire.read();
-
-  if(val & (1<<3))
-  {
-    Wire.beginTransmission(I2C_ADDR);
-    Wire.write(byte(0x00)); //control 1
-    Wire.write(val & ~(1<<3)); //set 12 hour mode (bit 3)
-    Wire.endTransmission();
-  }
-
-  return;
-}
-
-
-void RV8523::batterySwitchOver(int on) //activate/deactivate battery switch over mode
-{
-  uint8_t val;
-
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x02)); //control 3
-  Wire.endTransmission();
-  Wire.requestFrom(I2C_ADDR, 1);
-  val = Wire.read();
-  if(val & 0xE0)
-  {
-    Wire.beginTransmission(I2C_ADDR);
-    Wire.write(byte(0x02)); //control 3
-    if(on)
-    {
-      Wire.write(val & ~0xE0); //battery switchover in standard mode
-    }
-    else
-    {
-      Wire.write(val | 0xE0);  //battery switchover disabled
-    }
-    Wire.endTransmission();
-  }
-
-  return;
-}
-
 
 void RV8523::get(uint8_t *sec, uint8_t *min, uint8_t *hour, uint8_t *day, uint8_t *month, uint16_t *year)
 {
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x03));
-  Wire.endTransmission();
-
-  Wire.requestFrom(I2C_ADDR, 7);
-  *sec   = bcd2bin(Wire.read() & 0x7F);
-  *min   = bcd2bin(Wire.read() & 0x7F);
-  *hour  = bcd2bin(Wire.read() & 0x3F); //24 hour mode
-  *day   = bcd2bin(Wire.read() & 0x3F);
-           bcd2bin(Wire.read() & 0x07); //day of week
-  *month = bcd2bin(Wire.read() & 0x1F);
-  *year  = bcd2bin(Wire.read()) + 2000;
-
+  DateTime now = clockObj.now();
+  *sec = now.second();
+  *min = now.minute();
+  *hour = now.hour();
+  *day = now.day();
+  *month = now.month();
+  *year = now.year();
+  
   return;
 }
 
 
 void RV8523::get(int *sec, int *min, int *hour, int *day, int *month, int *year)
 {
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x03));
-  Wire.endTransmission();
-
-  Wire.requestFrom(I2C_ADDR, 7);
-  *sec   = bcd2bin(Wire.read() & 0x7F);
-  *min   = bcd2bin(Wire.read() & 0x7F);
-  *hour  = bcd2bin(Wire.read() & 0x3F); //24 hour mode
-  *day   = bcd2bin(Wire.read() & 0x3F);
-           bcd2bin(Wire.read() & 0x07); //day of week
-  *month = bcd2bin(Wire.read() & 0x1F);
-  *year  = bcd2bin(Wire.read()) + 2000;
+  DateTime now = clockObj.now();
+  *sec = now.second();
+  *min = now.minute();
+  *hour = now.hour();
+  *day = now.day();
+  *month = now.month();
+  *year = now.year();
 
   return;
 }
@@ -599,23 +478,7 @@ void RV8523::get(int *sec, int *min, int *hour, int *day, int *month, int *year)
 
 void RV8523::set(uint8_t sec, uint8_t min, uint8_t hour, uint8_t day, uint8_t month, uint16_t year)
 {
-  if(year > 2000)
-  {
-    year -= 2000;
-  }
-
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x03));
-  Wire.write(bin2bcd(sec));
-  Wire.write(bin2bcd(min));
-  Wire.write(bin2bcd(hour));
-  Wire.write(bin2bcd(day));
-  Wire.write(bin2bcd(0));
-  Wire.write(bin2bcd(month));
-  Wire.write(bin2bcd(year));
-  Wire.endTransmission();
-
-  return;
+  clockObj.adjust(DateTime(year, month, day, hour, min, sec));
 }
 
 
@@ -624,176 +487,47 @@ void RV8523::set(int sec, int min, int hour, int day, int month, int year)
   return set((uint8_t)sec, (uint8_t)min, (uint8_t)hour, (uint8_t)day, (uint8_t)month, (uint16_t)year);
 }
 
-
-//-------------------- Private --------------------
-
-
-uint8_t RV8523::bin2bcd(uint8_t val)
-{
-  return val + 6 * (val / 10);
-}
-
-
-uint8_t RV8523::bcd2bin(uint8_t val)
-{
-  return val - 6 * (val >> 4);
-}
-
-
 //-----new----RTC---Functions
 
 void RV8523::begin(void)
 {
-	start();
+	clockObj.begin();
 }
+
 // A convenient constructor for using "the compiler's time":
 void RV8523::setTime(const char* date, const char* time)
 {
-
-char buffer1[12];
-strcpy(buffer1, date);
-  uint16_t year =  (buffer1[7] -48) * 1000;
-  year += (buffer1[8] -48) * 100;
-  year += (buffer1[9] -48) * 10;
-  year += (buffer1[10] -48);
-
-  uint8_t month;
-  switch (buffer1[0]) {
-        case 'J': month = (buffer1[1] == 'a') ? 1 : ((buffer1[2] == 'n') ? 6 : 7); break;
-        case 'F': month = 2; break;
-        case 'A': month = buffer1[2] == 'r' ? 4 : 8; break;
-        case 'M': month = buffer1[2] == 'r' ? 3 : 5; break;
-        case 'S': month = 9; break;
-        case 'O': month = 10; break;
-        case 'N': month = 11; break;
-        case 'D': month = 12; break;
-    }
-
-  uint8_t day = (buffer1[4] -48) * 10;
-  day += (buffer1[5] -48);
-
-  char buffer2[9];
-  strcpy(buffer2, time);
-  uint8_t hour = (buffer2[0]-48)*10 + (buffer2[1]-48);
-  uint8_t min = (buffer2[3]-48)*10 + (buffer2[4]-48);
-  uint8_t sec = (buffer2[6]-48)*10 + (buffer2[7]-48);
-
-  set(sec,  min,  hour,  day,  month,  year);
-
-  return;
+  clockObj.adjust(DateTime(date, time));
 }
 
 uint16_t RV8523::getYear(void)
 {
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x03));
-  Wire.endTransmission();
-
-  Wire.requestFrom(I2C_ADDR, 7);
-  uint8_t sec   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t min   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t hour  = bcd2bin(Wire.read() & 0x3F); //24 hour mode
-  uint8_t day   = bcd2bin(Wire.read() & 0x3F);
-           bcd2bin(Wire.read() & 0x07); //day of week
-  uint8_t month = bcd2bin(Wire.read() & 0x1F);
-  uint16_t year  = bcd2bin(Wire.read()) + 2000;
-
-
-  return year;
+  return clockObj.now().year();
 }
 
 uint8_t RV8523::getMonth(void)
 {
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x03));
-  Wire.endTransmission();
-
-  Wire.requestFrom(I2C_ADDR, 7);
-  uint8_t sec   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t min   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t hour  = bcd2bin(Wire.read() & 0x3F); //24 hour mode
-  uint8_t day   = bcd2bin(Wire.read() & 0x3F);
-           bcd2bin(Wire.read() & 0x07); //day of week
-  uint8_t month = bcd2bin(Wire.read() & 0x1F);
-  uint16_t year  = bcd2bin(Wire.read()) + 2000;
-
-
-  return month;
+  return clockObj.now().month();
 }
 
 uint8_t RV8523::getDay(void)
 {
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x03));
-  Wire.endTransmission();
-
-  Wire.requestFrom(I2C_ADDR, 7);
-  uint8_t sec   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t min   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t hour  = bcd2bin(Wire.read() & 0x3F); //24 hour mode
-  uint8_t day   = bcd2bin(Wire.read() & 0x3F);
-           bcd2bin(Wire.read() & 0x07); //day of week
-  uint8_t month = bcd2bin(Wire.read() & 0x1F);
-  uint16_t year  = bcd2bin(Wire.read()) + 2000;
-
-
-  return day;
+  return clockObj.now().day();
 }
 
 uint8_t RV8523::getHour(void)
 {
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x03));
-  Wire.endTransmission();
-
-  Wire.requestFrom(I2C_ADDR, 7);
-  uint8_t sec   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t min   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t hour  = bcd2bin(Wire.read() & 0x3F); //24 hour mode
-  uint8_t day   = bcd2bin(Wire.read() & 0x3F);
-           bcd2bin(Wire.read() & 0x07); //day of week
-  uint8_t month = bcd2bin(Wire.read() & 0x1F);
-  uint16_t year  = bcd2bin(Wire.read()) + 2000;
-
-
-  return hour;
+  return clockObj.now().hour();
 }
 
 uint8_t RV8523::getMin(void)
 {
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x03));
-  Wire.endTransmission();
-
-  Wire.requestFrom(I2C_ADDR, 7);
-  uint8_t sec   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t min   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t hour  = bcd2bin(Wire.read() & 0x3F); //24 hour mode
-  uint8_t day   = bcd2bin(Wire.read() & 0x3F);
-           bcd2bin(Wire.read() & 0x07); //day of week
-  uint8_t month = bcd2bin(Wire.read() & 0x1F);
-  uint16_t year  = bcd2bin(Wire.read()) + 2000;
-
-  return min;
+  return clockObj.now().minute();
 }
 
 uint8_t RV8523::getSec(void)
 {
-  Wire.beginTransmission(I2C_ADDR);
-  Wire.write(byte(0x03));
-  Wire.endTransmission();
-
-  Wire.requestFrom(I2C_ADDR, 7);
-  uint8_t sec   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t min   = bcd2bin(Wire.read() & 0x7F);
-  uint8_t hour  = bcd2bin(Wire.read() & 0x3F); //24 hour mode
-  uint8_t day   = bcd2bin(Wire.read() & 0x3F);
-           bcd2bin(Wire.read() & 0x07); //day of week
-  uint8_t month = bcd2bin(Wire.read() & 0x1F);
-  uint16_t year  = bcd2bin(Wire.read()) + 2000;
-
-
-  return sec;
+  return clockObj.now().second();
 }
 
 /***************************************************************************

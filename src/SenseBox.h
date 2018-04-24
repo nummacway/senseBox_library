@@ -9,6 +9,7 @@
 #include "Wire.h"
 
 #include "OpenSenseMap.h"
+#include "RTClib.h"
 
 //----------------------------------------------------------------------HDC100X Stuff begin----//
 /*
@@ -260,7 +261,6 @@ float refVal = 0.4;
 //----------------------rtc-------------------------------
 /*
   RV8523 RTC Lib for Arduino
-  by Watterott electronic (www.watterott.com)
  */
 class RV8523
 {
@@ -268,14 +268,10 @@ class RV8523
     RV8523();
 
     void start(void);
-    void stop(void);
     void get(uint8_t *sec, uint8_t *min, uint8_t *hour, uint8_t *day, uint8_t *month, uint16_t *year);
     void get(int *sec, int *min, int *hour, int *day, int *month, int *year);
     void set(uint8_t sec, uint8_t min, uint8_t hour, uint8_t day, uint8_t month, uint16_t year);
     void set(int sec, int min, int hour, int day, int month, int year);
-    void set12HourMode(void);
-    void set24HourMode(void);
-    void batterySwitchOver(int on);
 
 
     //new funtions
@@ -290,8 +286,7 @@ class RV8523
 
 
   private:
-    uint8_t bin2bcd(uint8_t val);
-    uint8_t bcd2bin(uint8_t val);
+    RTC_DS1307 clockObj;
 };
 
 
